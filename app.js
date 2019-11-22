@@ -1,15 +1,43 @@
 const express = require('express')
-const os = require('os')
 const app = express()
-const workerFarm = require('node-worker-farm')
-const worker = workerFarm(require.resolve('./worker.js'))
 
-app.get('/', (req, res) => {
-    const max = Number(req.query.max) || 1000
-    worker(max, (err, primes) => {
-        if (err) res.status(500).send(err)
-        else res.json(primes)
-    })
+const storage = []
+
+app.get('/factorial', (req, res) => {
+    const rootUrl = (url) => req.protocol + '://' + req.get('host') + url;
+    
+    const id = storage.length + 1;
+    setTimeout(() => {
+        let sum = 1;
+        for (let i = Number(req.query.value) || 1; i >= 1; i--) {
+            sum *= i
+        }
+        storage.push(sum)
+        if (!res.headersSent) res.json({ factorial: sum })
+    }, 10000) //delay for 10 seconds
+
+    setTimeout(() => {
+        if (!res.headersSent) {
+            res.status(202).json({ 
+                    location: rootUrl('/factorial/' + id)
+            })
+        }
+    }, 500) //interrupt response after 500 ms
+})
+
+app.get('/factorial/:id', (req, res) => {
+    let id = Number(req.params.id)
+
+    if (!!id) {
+        if (storage[id - 1]) {
+            res.json({
+                factorial: storage[id - 1]
+            })
+        }
+        else {
+            res.status(202).send({ message: 'please wait' })
+        }
+    }
 })
 
 app.listen(process.env.PORT || 3030)

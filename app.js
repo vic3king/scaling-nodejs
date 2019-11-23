@@ -1,43 +1,31 @@
 const express = require('express')
+const crypto = require('crypto')
+const isPrime = require('./is-prime')
 const app = express()
 
-const storage = []
+const calculateHash = function (req, res, buf, encoding){
+    const hash = crypto.createHash('sha1')
+    hash.setEncoding('hex')
+    hash.write(buf.toString(encoding || 'utf8'))
+    hash.end()
+    var sha1sum = hash.read()
+    req.hash = sha1sum
+}
 
-app.get('/factorial', (req, res) => {
-    const rootUrl = (url) => req.protocol + '://' + req.get('host') + url;
-    
-    const id = storage.length + 1;
-    setTimeout(() => {
-        let sum = 1;
-        for (let i = Number(req.query.value) || 1; i >= 1; i--) {
-            sum *= i
-        }
-        storage.push(sum)
-        if (!res.headersSent) res.json({ factorial: sum })
-    }, 10000) //delay for 10 seconds
+const textBodyParser = require('body-parser').text({ verify: calculateHash })
 
-    setTimeout(() => {
-        if (!res.headersSent) {
-            res.status(202).json({ 
-                    location: rootUrl('/factorial/' + id)
-            })
-        }
-    }, 500) //interrupt response after 500 ms
+app.post('/', textBodyParser, (req, res) => {
+    storage[req.hash] = storage[req.hash] || req.body.split('\n').map((line) => line.split('').reverse().join('')).join('\n')
+    res.send(storage[req.hash])
 })
 
-app.get('/factorial/:id', (req, res) => {
-    let id = Number(req.params.id)
-
-    if (!!id) {
-        if (storage[id - 1]) {
-            res.json({
-                factorial: storage[id - 1]
-            })
-        }
-        else {
-            res.status(202).send({ message: 'please wait' })
-        }
+app.get('/', (req, res) => {
+    const primes = []
+    const max = Number(req.query.max) || 1000
+    for (let i = 1; i <= max; i++) {
+        if (isPrime(i)) primes.push(i)
     }
+    res.json(primes)
 })
 
 app.listen(process.env.PORT || 3030)
